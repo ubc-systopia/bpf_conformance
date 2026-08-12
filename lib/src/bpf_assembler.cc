@@ -192,8 +192,6 @@ typedef class _bpf_assembler
             inst[0].src = static_cast<uint32_t>(6);
             inst[0].imm = _decode_imm32(operands[1]);
             inst[1].imm = _decode_imm32(operands[2]);
-        } else {
-            throw std::runtime_error(std::string("Invalid mnemonic: ") + mnemonic);
         }
 
         return inst;
@@ -221,8 +219,6 @@ typedef class _bpf_assembler
             inst.opcode = EBPF_OP_LDXSH;
         } else if (mnemonic == "ldxsw") {
             inst.opcode = EBPF_OP_LDXSW;
-        } else {
-            throw std::runtime_error(std::string("Invalid mnemonic: ") + mnemonic);
         }
 
         return inst;
