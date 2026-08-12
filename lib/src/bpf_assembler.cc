@@ -42,25 +42,9 @@ typedef class _bpf_assembler
     };
 
     const std::unordered_map<std::string, int> _bpf_encode_alu_ops{
-        {"add", 0x0},
-        {"sub", 0x1},
-        {"mul", 0x2},
-        {"div", 0x3},
-        {"sdiv", 0x3},
-        {"or", 0x4},
-        {"and", 0x5},
-        {"lsh", 0x6},
-        {"rsh", 0x7},
-        {"neg", 0x8},
-        {"mod", 0x9},
-        {"smod", 0x9},
-        {"xor", 0xa},
-        {"mov", 0xb},
-        {"movsx", 0xb},
-        {"arsh", 0xc},
-        {"le", 0xd},
-        {"be", 0xd},
-        {"swap", 0xd},
+        {"add", 0x0},   {"sub", 0x1},  {"mul", 0x2}, {"div", 0x3}, {"sdiv", 0x3}, {"or", 0x4},  {"and", 0x5},
+        {"lsh", 0x6},   {"rsh", 0x7},  {"neg", 0x8}, {"mod", 0x9}, {"smod", 0x9}, {"xor", 0xa}, {"mov", 0xb},
+        {"movsx", 0xb}, {"arsh", 0xc}, {"le", 0xd},  {"be", 0xd},  {"swap", 0xd},
     };
 
     const std::unordered_map<std::string, int> _bpf_encode_jmp_ops{
@@ -177,16 +161,38 @@ typedef class _bpf_assembler
     }
 
     bpf_encode_result_t
-    _encode_ld([[maybe_unused]] const std::string& mnemonic, const std::vector<std::string>& operands)
+    _encode_ld(const std::string& mnemonic, const std::vector<std::string>& operands)
     {
         std::array<ebpf_inst, 2> inst{};
         // Issue: https://github.com/Alan-Jowett/bpf_conformance/issues/59
         // Add support for other 64-bit immediate values.
         inst[0].opcode = EBPF_OP_LDDW;
         inst[0].dst = _decode_register(operands[0]);
-        uint64_t immediate = _decode_imm64(operands[1]);
-        inst[0].imm = static_cast<uint32_t>(immediate);
-        inst[1].imm = static_cast<uint32_t>(immediate >> 32);
+        if (mnemonic == "lddw") {
+            uint64_t immediate = _decode_imm64(operands[1]);
+            inst[0].imm = static_cast<uint32_t>(immediate);
+            inst[1].imm = static_cast<uint32_t>(immediate >> 32);
+        } else if (mnemonic == "lddw_mapfd") {
+            inst[0].src = static_cast<uint32_t>(1);
+            inst[0].imm = _decode_imm32(operands[1]);
+        } else if (mnemonic == "lddw_mapvalfd") {
+            inst[0].src = static_cast<uint32_t>(2);
+            inst[0].imm = _decode_imm32(operands[1]);
+            inst[1].imm = _decode_imm32(operands[2]);
+        } else if (mnemonic == "lddw_varaddr") {
+            inst[0].src = static_cast<uint32_t>(3);
+            inst[0].imm = _decode_imm32(operands[1]);
+        } else if (mnemonic == "lddw_codeaddr") {
+            inst[0].src = static_cast<uint32_t>(4);
+            inst[0].imm = _decode_imm32(operands[1]);
+        } else if (mnemonic == "lddw_mapidx") {
+            inst[0].src = static_cast<uint32_t>(5);
+            inst[0].imm = _decode_imm32(operands[1]);
+        } else if (mnemonic == "lddw_mapvalidx") {
+            inst[0].src = static_cast<uint32_t>(6);
+            inst[0].imm = _decode_imm32(operands[1]);
+            inst[1].imm = _decode_imm32(operands[2]);
+        }
 
         return inst;
     }
@@ -213,8 +219,6 @@ typedef class _bpf_assembler
             inst.opcode = EBPF_OP_LDXSH;
         } else if (mnemonic == "ldxsw") {
             inst.opcode = EBPF_OP_LDXSW;
-        } else {
-            throw std::runtime_error(std::string("Invalid mnemonic: ") + mnemonic);
         }
 
         return inst;
@@ -499,54 +503,53 @@ typedef class _bpf_assembler
     }
 
     const std::unordered_map<std::string, std::tuple<bpf_encode_t, size_t>> _bpf_mnemonic_map{
-        {"add", {&_bpf_assembler::_encode_alu, 2}},   {"add32", {&_bpf_assembler::_encode_alu, 2}},
-        {"and", {&_bpf_assembler::_encode_alu, 2}},   {"and32", {&_bpf_assembler::_encode_alu, 2}},
-        {"arsh", {&_bpf_assembler::_encode_alu, 2}},  {"arsh32", {&_bpf_assembler::_encode_alu, 2}},
-        {"be16", {&_bpf_assembler::_encode_alu, 1}},  {"be32", {&_bpf_assembler::_encode_alu, 1}},
-        {"be64", {&_bpf_assembler::_encode_alu, 1}},  {"call", {&_bpf_assembler::_encode_jmp, 2}},
-        {"div", {&_bpf_assembler::_encode_alu, 2}},   {"div32", {&_bpf_assembler::_encode_alu, 2}},
-        {"exit", {&_bpf_assembler::_encode_jmp, 0}},  {"ja", {&_bpf_assembler::_encode_jmp, 1}},
-        {"ja32", {&_bpf_assembler::_encode_jmp, 1}},
-        {"jeq", {&_bpf_assembler::_encode_jmp, 3}},   {"jeq32", {&_bpf_assembler::_encode_jmp, 3}},
-        {"jge", {&_bpf_assembler::_encode_jmp, 3}},   {"jge32", {&_bpf_assembler::_encode_jmp, 3}},
-        {"jgt", {&_bpf_assembler::_encode_jmp, 3}},   {"jgt32", {&_bpf_assembler::_encode_jmp, 3}},
-        {"jle", {&_bpf_assembler::_encode_jmp, 3}},   {"jle32", {&_bpf_assembler::_encode_jmp, 3}},
-        {"jlt", {&_bpf_assembler::_encode_jmp, 3}},   {"jlt32", {&_bpf_assembler::_encode_jmp, 3}},
-        {"jne", {&_bpf_assembler::_encode_jmp, 3}},   {"jne32", {&_bpf_assembler::_encode_jmp, 3}},
-        {"jset", {&_bpf_assembler::_encode_jmp, 3}},  {"jset32", {&_bpf_assembler::_encode_jmp, 3}},
-        {"jsge", {&_bpf_assembler::_encode_jmp, 3}},  {"jsge32", {&_bpf_assembler::_encode_jmp, 3}},
-        {"jsgt", {&_bpf_assembler::_encode_jmp, 3}},  {"jsgt32", {&_bpf_assembler::_encode_jmp, 3}},
-        {"jsle", {&_bpf_assembler::_encode_jmp, 3}},  {"jsle32", {&_bpf_assembler::_encode_jmp, 3}},
-        {"jslt", {&_bpf_assembler::_encode_jmp, 3}},  {"jslt32", {&_bpf_assembler::_encode_jmp, 3}},
-        {"lddw", {&_bpf_assembler::_encode_ld, 2}},   {"ldxb", {&_bpf_assembler::_encode_ldx, 2}},
-        {"ldxdw", {&_bpf_assembler::_encode_ldx, 2}}, {"ldxh", {&_bpf_assembler::_encode_ldx, 2}},
-        {"ldxw", {&_bpf_assembler::_encode_ldx, 2}},  {"ldxsb", {&_bpf_assembler::_encode_ldx, 2}},
-        {"ldxsh", {&_bpf_assembler::_encode_ldx, 2}}, {"ldxsw", {&_bpf_assembler::_encode_ldx, 2}},
-        {"le16", {&_bpf_assembler::_encode_alu, 1}},
-        {"le32", {&_bpf_assembler::_encode_alu, 1}},  {"le64", {&_bpf_assembler::_encode_alu, 1}},
-        {"lsh", {&_bpf_assembler::_encode_alu, 2}},   {"lsh32", {&_bpf_assembler::_encode_alu, 2}},
-        {"mod", {&_bpf_assembler::_encode_alu, 2}},   {"mod32", {&_bpf_assembler::_encode_alu, 2}},
-        {"mov", {&_bpf_assembler::_encode_alu, 2}},   {"mov32", {&_bpf_assembler::_encode_alu, 2}},
-        {"movsx864", {&_bpf_assembler::_encode_alu, 2}}, {"movsx832", {&_bpf_assembler::_encode_alu, 2}},
-        {"movsx1664", {&_bpf_assembler::_encode_alu, 2}}, {"movsx1632", {&_bpf_assembler::_encode_alu, 2}},
-        {"movsx3264", {&_bpf_assembler::_encode_alu, 2}},
-        {"mul", {&_bpf_assembler::_encode_alu, 2}},   {"mul32", {&_bpf_assembler::_encode_alu, 2}},
-        {"neg", {&_bpf_assembler::_encode_alu, 1}},   {"neg32", {&_bpf_assembler::_encode_alu, 1}},
-        {"or", {&_bpf_assembler::_encode_alu, 2}},    {"or32", {&_bpf_assembler::_encode_alu, 2}},
-        {"rsh", {&_bpf_assembler::_encode_alu, 2}},   {"rsh32", {&_bpf_assembler::_encode_alu, 2}},
-        {"sdiv", {&_bpf_assembler::_encode_alu, 2}},  {"sdiv32", {&_bpf_assembler::_encode_alu, 2}},
-        {"smod", {&_bpf_assembler::_encode_alu, 2}},  {"smod32", {&_bpf_assembler::_encode_alu, 2}},
-        {"stb", {&_bpf_assembler::_encode_st, 2}},    {"stdw", {&_bpf_assembler::_encode_st, 2}},
-        {"sth", {&_bpf_assembler::_encode_st, 2}},    {"stw", {&_bpf_assembler::_encode_st, 2}},
-        {"stxb", {&_bpf_assembler::_encode_stx, 2}},  {"stxdw", {&_bpf_assembler::_encode_stx, 2}},
-        {"stxh", {&_bpf_assembler::_encode_stx, 2}},  {"stxw", {&_bpf_assembler::_encode_stx, 2}},
-        {"sub", {&_bpf_assembler::_encode_alu, 2}},   {"sub32", {&_bpf_assembler::_encode_alu, 2}},
-        {"swap16", {&_bpf_assembler::_encode_alu, 1}},{"swap32", {&_bpf_assembler::_encode_alu, 1}},
-        {"swap64", {&_bpf_assembler::_encode_alu, 1}},
-        {"bswap16", {&_bpf_assembler::_encode_alu, 1}},
-        {"bswap32", {&_bpf_assembler::_encode_alu, 1}},
-        {"bswap64", {&_bpf_assembler::_encode_alu, 1}},
-        {"xor", {&_bpf_assembler::_encode_alu, 2}},
+        {"add", {&_bpf_assembler::_encode_alu, 2}},         {"add32", {&_bpf_assembler::_encode_alu, 2}},
+        {"and", {&_bpf_assembler::_encode_alu, 2}},         {"and32", {&_bpf_assembler::_encode_alu, 2}},
+        {"arsh", {&_bpf_assembler::_encode_alu, 2}},        {"arsh32", {&_bpf_assembler::_encode_alu, 2}},
+        {"be16", {&_bpf_assembler::_encode_alu, 1}},        {"be32", {&_bpf_assembler::_encode_alu, 1}},
+        {"be64", {&_bpf_assembler::_encode_alu, 1}},        {"call", {&_bpf_assembler::_encode_jmp, 2}},
+        {"div", {&_bpf_assembler::_encode_alu, 2}},         {"div32", {&_bpf_assembler::_encode_alu, 2}},
+        {"exit", {&_bpf_assembler::_encode_jmp, 0}},        {"ja", {&_bpf_assembler::_encode_jmp, 1}},
+        {"ja32", {&_bpf_assembler::_encode_jmp, 1}},        {"jeq", {&_bpf_assembler::_encode_jmp, 3}},
+        {"jeq32", {&_bpf_assembler::_encode_jmp, 3}},       {"jge", {&_bpf_assembler::_encode_jmp, 3}},
+        {"jge32", {&_bpf_assembler::_encode_jmp, 3}},       {"jgt", {&_bpf_assembler::_encode_jmp, 3}},
+        {"jgt32", {&_bpf_assembler::_encode_jmp, 3}},       {"jle", {&_bpf_assembler::_encode_jmp, 3}},
+        {"jle32", {&_bpf_assembler::_encode_jmp, 3}},       {"jlt", {&_bpf_assembler::_encode_jmp, 3}},
+        {"jlt32", {&_bpf_assembler::_encode_jmp, 3}},       {"jne", {&_bpf_assembler::_encode_jmp, 3}},
+        {"jne32", {&_bpf_assembler::_encode_jmp, 3}},       {"jset", {&_bpf_assembler::_encode_jmp, 3}},
+        {"jset32", {&_bpf_assembler::_encode_jmp, 3}},      {"jsge", {&_bpf_assembler::_encode_jmp, 3}},
+        {"jsge32", {&_bpf_assembler::_encode_jmp, 3}},      {"jsgt", {&_bpf_assembler::_encode_jmp, 3}},
+        {"jsgt32", {&_bpf_assembler::_encode_jmp, 3}},      {"jsle", {&_bpf_assembler::_encode_jmp, 3}},
+        {"jsle32", {&_bpf_assembler::_encode_jmp, 3}},      {"jslt", {&_bpf_assembler::_encode_jmp, 3}},
+        {"jslt32", {&_bpf_assembler::_encode_jmp, 3}},      {"lddw", {&_bpf_assembler::_encode_ld, 2}},
+        {"lddw_mapfd", {&_bpf_assembler::_encode_ld, 2}},   {"lddw_mapvalfd", {&_bpf_assembler::_encode_ld, 3}},
+        {"lddw_varaddr", {&_bpf_assembler::_encode_ld, 2}}, {"lddw_codeaddr", {&_bpf_assembler::_encode_ld, 2}},
+        {"lddw_mapidx", {&_bpf_assembler::_encode_ld, 2}},  {"lddw_mapvalidx", {&_bpf_assembler::_encode_ld, 3}},
+        {"ldxb", {&_bpf_assembler::_encode_ldx, 2}},        {"ldxdw", {&_bpf_assembler::_encode_ldx, 2}},
+        {"ldxh", {&_bpf_assembler::_encode_ldx, 2}},        {"ldxw", {&_bpf_assembler::_encode_ldx, 2}},
+        {"ldxsb", {&_bpf_assembler::_encode_ldx, 2}},       {"ldxsh", {&_bpf_assembler::_encode_ldx, 2}},
+        {"ldxsw", {&_bpf_assembler::_encode_ldx, 2}},       {"le16", {&_bpf_assembler::_encode_alu, 1}},
+        {"le32", {&_bpf_assembler::_encode_alu, 1}},        {"le64", {&_bpf_assembler::_encode_alu, 1}},
+        {"lsh", {&_bpf_assembler::_encode_alu, 2}},         {"lsh32", {&_bpf_assembler::_encode_alu, 2}},
+        {"mod", {&_bpf_assembler::_encode_alu, 2}},         {"mod32", {&_bpf_assembler::_encode_alu, 2}},
+        {"mov", {&_bpf_assembler::_encode_alu, 2}},         {"mov32", {&_bpf_assembler::_encode_alu, 2}},
+        {"movsx864", {&_bpf_assembler::_encode_alu, 2}},    {"movsx832", {&_bpf_assembler::_encode_alu, 2}},
+        {"movsx1664", {&_bpf_assembler::_encode_alu, 2}},   {"movsx1632", {&_bpf_assembler::_encode_alu, 2}},
+        {"movsx3264", {&_bpf_assembler::_encode_alu, 2}},   {"mul", {&_bpf_assembler::_encode_alu, 2}},
+        {"mul32", {&_bpf_assembler::_encode_alu, 2}},       {"neg", {&_bpf_assembler::_encode_alu, 1}},
+        {"neg32", {&_bpf_assembler::_encode_alu, 1}},       {"or", {&_bpf_assembler::_encode_alu, 2}},
+        {"or32", {&_bpf_assembler::_encode_alu, 2}},        {"rsh", {&_bpf_assembler::_encode_alu, 2}},
+        {"rsh32", {&_bpf_assembler::_encode_alu, 2}},       {"sdiv", {&_bpf_assembler::_encode_alu, 2}},
+        {"sdiv32", {&_bpf_assembler::_encode_alu, 2}},      {"smod", {&_bpf_assembler::_encode_alu, 2}},
+        {"smod32", {&_bpf_assembler::_encode_alu, 2}},      {"stb", {&_bpf_assembler::_encode_st, 2}},
+        {"stdw", {&_bpf_assembler::_encode_st, 2}},         {"sth", {&_bpf_assembler::_encode_st, 2}},
+        {"stw", {&_bpf_assembler::_encode_st, 2}},          {"stxb", {&_bpf_assembler::_encode_stx, 2}},
+        {"stxdw", {&_bpf_assembler::_encode_stx, 2}},       {"stxh", {&_bpf_assembler::_encode_stx, 2}},
+        {"stxw", {&_bpf_assembler::_encode_stx, 2}},        {"sub", {&_bpf_assembler::_encode_alu, 2}},
+        {"sub32", {&_bpf_assembler::_encode_alu, 2}},       {"swap16", {&_bpf_assembler::_encode_alu, 1}},
+        {"swap32", {&_bpf_assembler::_encode_alu, 1}},      {"swap64", {&_bpf_assembler::_encode_alu, 1}},
+        {"bswap16", {&_bpf_assembler::_encode_alu, 1}},     {"bswap32", {&_bpf_assembler::_encode_alu, 1}},
+        {"bswap64", {&_bpf_assembler::_encode_alu, 1}},     {"xor", {&_bpf_assembler::_encode_alu, 2}},
         {"xor32", {&_bpf_assembler::_encode_alu, 2}},
     };
 
@@ -597,10 +600,11 @@ typedef class _bpf_assembler
 
             // Check for labels.
             if (mnemonic.ends_with(':')) {
-                auto label =  mnemonic.substr(0, mnemonic.length() - 1);
+                auto label = mnemonic.substr(0, mnemonic.length() - 1);
                 if (_labels.contains(label)) {
                     std::stringstream ss{};
-                    ss << "Duplicate label (" + label + ") detected at line " << output.size() << " (previous declaration at line " << _labels[label] << ")";
+                    ss << "Duplicate label (" + label + ") detected at line " << output.size()
+                       << " (previous declaration at line " << _labels[label] << ")";
                     throw std::runtime_error(ss.str());
                 }
                 _labels[label] = output.size();

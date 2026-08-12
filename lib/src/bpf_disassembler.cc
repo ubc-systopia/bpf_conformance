@@ -379,11 +379,33 @@ bpf_disassembler(const std::vector<ebpf_inst>& instructions, std::ostream& outpu
         // Handle lddw specially to show the full 64-bit immediate
         if ((inst.opcode & EBPF_CLS_MASK) == EBPF_CLS_LD && (inst.opcode & 0x18) == EBPF_SIZE_DW &&
             (inst.opcode & 0xe0) == EBPF_MODE_IMM) {
-            uint64_t imm64 = static_cast<uint32_t>(inst.imm);
-            if (i + 1 < instructions.size()) {
-                imm64 |= (static_cast<uint64_t>(static_cast<uint32_t>(instructions[i + 1].imm)) << 32);
+            if (inst.src == 0) {
+                uint64_t imm64 = static_cast<uint32_t>(inst.imm);
+                if (i + 1 < instructions.size()) {
+                    imm64 |= (static_cast<uint64_t>(static_cast<uint32_t>(instructions[i + 1].imm)) << 32);
+                }
+                output << "lddw %r" << static_cast<int>(inst.dst) << ", 0x" << std::hex << imm64 << std::dec;
+            } else if (inst.src == 1) {
+                output << "lddw_mapfd %r" << static_cast<int>(inst.dst) << ", 0x" << std::hex
+                       << static_cast<uint32_t>(inst.imm) << std::dec;
+            } else if (inst.src == 2) {
+                uint32_t next_imm = (i + 1 < instructions.size()) ? static_cast<uint32_t>(instructions[i + 1].imm) : 0;
+                output << "lddw_mapvalfd %r" << static_cast<int>(inst.dst) << ", 0x" << std::hex
+                       << static_cast<uint32_t>(inst.imm) << ", 0x" << next_imm << std::dec;
+            } else if (inst.src == 3) {
+                output << "lddw_varaddr %r" << static_cast<int>(inst.dst) << ", 0x" << std::hex
+                       << static_cast<uint32_t>(inst.imm) << std::dec;
+            } else if (inst.src == 4) {
+                output << "lddw_codeaddr %r" << static_cast<int>(inst.dst) << ", 0x" << std::hex
+                       << static_cast<uint32_t>(inst.imm) << std::dec;
+            } else if (inst.src == 5) {
+                output << "lddw_mapidx %r" << static_cast<int>(inst.dst) << ", 0x" << std::hex
+                       << static_cast<uint32_t>(inst.imm) << std::dec;
+            } else { // inst.src == 6
+                uint32_t next_imm = (i + 1 < instructions.size()) ? static_cast<uint32_t>(instructions[i + 1].imm) : 0;
+                output << "lddw_mapvalidx %r" << static_cast<int>(inst.dst) << ", 0x" << std::hex
+                       << static_cast<uint32_t>(inst.imm) << ", 0x" << next_imm << std::dec;
             }
-            output << "lddw %r" << static_cast<int>(inst.dst) << ", 0x" << std::hex << imm64 << std::dec;
 
             if (show_raw) {
                 output << " ; " << format_raw_bytes(inst);
