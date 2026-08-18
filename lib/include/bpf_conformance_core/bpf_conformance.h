@@ -133,6 +133,7 @@ typedef struct _bpf_conformance_options
     bool debug = false;
     bool xdp_prolog = false;
     bool elf_format = false;
+    bool verifier_mode = false;
 } bpf_conformance_options_t;
 
 /**

@@ -111,6 +111,7 @@ main(int argc, char** argv)
             "debug", boost::program_options::value<bool>(), "Print debug information")(
             "xdp_prolog", boost::program_options::value<bool>(), "XDP prolog")(
             "elf", boost::program_options::value<bool>(), "ELF format")(
+            "verifier", boost::program_options::value<bool>(), "Verifier conformance mode")(
             "cpu_version", boost::program_options::value<std::string>(), "CPU version (valid values: v1, v2, v3, v4), default is v3")(
             "include_groups",
             boost::program_options::value<std::vector<std::string>>()->multitoken(),
@@ -229,6 +230,7 @@ Examples:
         bool list_unused_instructions = vm.count("list_unused_instructions") ? vm["list_unused_instructions"].as<bool>() : false;
         bool xdp_prolog = vm.count("xdp_prolog") ? vm["xdp_prolog"].as<bool>() : false;
         bool elf_format = vm.count("elf") ? vm["elf"].as<bool>() : false;
+        bool verifier_mode = vm.count("verifier") ? vm["verifier"].as<bool>() : false;
         bpf_conformance_list_instructions_t list_instructions = bpf_conformance_list_instructions_t::LIST_INSTRUCTIONS_NONE;
         if (show_instructions) {
             list_instructions = bpf_conformance_list_instructions_t::LIST_INSTRUCTIONS_ALL;
@@ -247,6 +249,7 @@ Examples:
         options.debug = debug;
         options.xdp_prolog = xdp_prolog;
         options.elf_format = elf_format;
+        options.verifier_mode = verifier_mode;
 
         std::map<std::filesystem::path, std::tuple<bpf_conformance_test_result_t, std::string>> test_results;
         test_results = bpf_conformance_options(tests, plugin_path, plugin_options, options);
@@ -257,7 +260,11 @@ Examples:
             auto [result, message] = test.second;
             switch (result) {
             case bpf_conformance_test_result_t::TEST_RESULT_PASS:
-                std::cout << "PASS: " << test.first << std::endl;
+                std::cout << "PASS: " << test.first;
+                if (!message.empty()) {
+                    std::cout << " " << message;
+                }
+                std::cout << std::endl;
                 tests_passed++;
                 tests_run++;
                 break;

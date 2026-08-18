@@ -8,8 +8,8 @@
 #include <sstream>
 #include <iostream>
 
-std::tuple<std::vector<uint8_t>, uint64_t, std::string, std::vector<ebpf_inst>>
-parse_test_file(const std::filesystem::path& data_file)
+bpf_test_file_t
+parse_test_file_with_verifier(const std::filesystem::path& data_file)
 {
     enum class _state
     {
@@ -19,6 +19,8 @@ parse_test_file(const std::filesystem::path& data_file)
         state_result,
         state_memory,
         state_error,
+        state_verifier,
+        state_verifier_reason,
     } state = _state::state_ignore;
 
     std::stringstream data_out;
@@ -28,6 +30,8 @@ parse_test_file(const std::filesystem::path& data_file)
     std::string mem;
     std::string line;
     std::string expected_error;
+    std::string verifier_verdict;
+    std::string verifier_reason;
     std::string raw;
 
     while (std::getline(data_in, line)) {
@@ -63,6 +67,12 @@ parse_test_file(const std::filesystem::path& data_file)
             } else if (line.find("error") != std::string::npos) {
                 state = _state::state_error;
                 continue;
+            } else if (line.find("verifier reason") != std::string::npos) {
+                state = _state::state_verifier_reason;
+                continue;
+            } else if (line.find("verifier") != std::string::npos) {
+                state = _state::state_verifier;
+                continue;
             } else {
                 std::cout << "Skipping: Unknown directive " << line << " in file " << data_file << std::endl;
                 return {};
@@ -89,13 +99,35 @@ parse_test_file(const std::filesystem::path& data_file)
         case _state::state_raw:
             raw += std::string(" ") + line;
             break;
+        case _state::state_verifier:
+            verifier_verdict = line;
+            break;
+        case _state::state_verifier_reason:
+            if (!verifier_reason.empty()) {
+                verifier_reason += "\n";
+            }
+            verifier_reason += line;
+            break;
         default:
             continue;
         }
     }
 
-    if (expected_error.empty() && result_string.empty()) {
-        std::cout << "Skipping: No result or error in test file " << data_file << std::endl;
+    std::optional<bpf_verifier_expectation_t> verifier_expectation;
+    if (!verifier_verdict.empty()) {
+        if (verifier_verdict == "accept") {
+            verifier_expectation = bpf_verifier_expectation_t{bpf_verifier_verdict_t::accept, verifier_reason};
+        } else if (verifier_verdict == "reject") {
+            verifier_expectation = bpf_verifier_expectation_t{bpf_verifier_verdict_t::reject, verifier_reason};
+        } else {
+            throw std::runtime_error(
+                "Invalid verifier verdict '" + verifier_verdict + "' in test file " + data_file.string());
+        }
+    }
+
+    const bool has_runtime_expectation = !expected_error.empty() || !result_string.empty();
+    if (!has_runtime_expectation && !verifier_expectation.has_value()) {
+        std::cout << "Skipping: No runtime or verifier expectation in test file " << data_file << std::endl;
         return {};
     }
 
@@ -144,5 +176,22 @@ parse_test_file(const std::filesystem::path& data_file)
         }
     }
 
-    return {input_buffer, result_value, expected_error, instructions};
+    return {
+        input_buffer,
+        result_value,
+        expected_error,
+        instructions,
+        has_runtime_expectation,
+        verifier_expectation,
+    };
+}
+
+std::tuple<std::vector<uint8_t>, uint64_t, std::string, std::vector<ebpf_inst>>
+parse_test_file(const std::filesystem::path& data_file)
+{
+    auto test = parse_test_file_with_verifier(data_file);
+    if (!test.has_runtime_expectation) {
+        return {};
+    }
+    return {test.memory, test.expected_return_value, test.expected_error, test.instructions};
 }

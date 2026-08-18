@@ -78,12 +78,40 @@ Options:
   --debug (true|false)           Print debug information
   --xdp_prolog (true|false)      XDP prolog
   --elf (true|false)             ELF format
+  --verifier (true|false)        Verifier conformance mode
   --cpu_version arg              CPU version
   --include_regex arg            Include regex
   --exclude_regex arg            Exclude regex
 ```
 
-`--xdp_prolog true` should *only* be used with the `libbpf_plugin`.
+`--xdp_prolog true` should be used for plugins that support XDP program type,
+including `libbpf_plugin`, `alivio_plugin`, and `prevail_plugin`.
+
+## Verifier conformance
+
+Verifier mode tests program admission rather than runtime register values.
+Enable it with `--verifier true`. A verifier plugin exits with code 0 when the
+program is accepted, code 1 when it is rejected, and code 2 or greater for a
+plugin or infrastructure error. A rejection reason is returned on stdout or
+stderr and is included in the test result.
+
+Tests without verifier metadata default to expected acceptance. Negative
+verifier tests use `-- verifier` followed by `reject`; an optional
+`-- verifier reason` section supplies an ECMAScript regular expression. The
+runner searches the verifier's complete output for a match, so an unanchored
+plain string continues to work.
+
+On Linux, the bundled libbpf plugin can expose the kernel verifier without
+executing accepted programs or adding its runtime R0 wrapper:
+
+```sh
+sudo build/bin/bpf_conformance_runner \
+  --test_file_directory verifier_tests \
+  --plugin_path build/bin/libbpf_plugin \
+  --plugin_options "--verify-only" \
+  --verifier true \
+  --xdp_prolog true
+```
 
 ## Using a published package
 Select the desired version from [bpf_conformance](https://github.com/Alan-Jowett/bpf_conformance/pkgs/container/bpf_conformance)
