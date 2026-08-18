@@ -11,4 +11,4 @@ exit
 -- verifier
 reject
 -- verifier reason
-Unsafe (bpf_context|ctx) access
+(invalid bpf_context|Unsafe ctx) access
