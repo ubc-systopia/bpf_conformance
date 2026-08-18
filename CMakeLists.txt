@@ -37,6 +37,9 @@ endif()
 # Always build the core library (no external dependencies, unless ELFIO is available)
 add_subdirectory("lib")
 
+add_subdirectory("alivio_plugin")
+add_subdirectory("prevail_plugin")
+
 # Optionally build tools (requires Boost and ELFIO)
 if(BPF_CONFORMANCE_BUILD_TOOLS)
   include("cmake/FindLibBpf.cmake")
