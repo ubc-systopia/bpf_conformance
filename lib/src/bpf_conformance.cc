@@ -324,7 +324,8 @@ bpf_conformance_run(
                     if (!reason_matches) {
                         test_results[test] = {
                             bpf_conformance_test_result_t::TEST_RESULT_FAIL,
-                            "verifier rejection reason does not match expected regex '" + expected.reason + "'"};
+                            "verifier rejection reason does not match expected regex '" + expected.reason +
+                                "'\nActual verifier output:\n" + (reason.empty() ? "<empty>" : reason)};
                     } else {
                         std::string message =
                             actual_verdict == bpf_verifier_verdict_t::accept ? "accepted" : "rejected";
