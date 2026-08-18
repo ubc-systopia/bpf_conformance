@@ -14,6 +14,7 @@
 #include <linux/bpf_common.h>
 #include <memory>
 #include <sys/types.h>
+#include <unistd.h>
 #include <tuple>
 #include <vector>
 #include <string>
@@ -147,6 +148,52 @@ load_bpf_instructions(const std::string& program_string, int map_fd, size_t memo
     return fd;
 }
 
+// Load the submitted instruction stream without the runtime-only return-value wrapper.
+int
+verify_bpf_instructions(const std::string& program_string, std::string& log)
+{
+    auto program = bytes_to_ebpf_inst(base16_decode(program_string));
+    constexpr uint32_t log_size = 64 * 1024;
+    log.assign(log_size, '\0');
+#ifdef USE_DEPRECATED_LOAD_PROGRAM
+    return bpf_load_program(
+        BPF_PROG_TYPE_XDP,
+        reinterpret_cast<const bpf_insn*>(program.data()),
+        static_cast<uint32_t>(program.size()),
+        "MIT",
+        0,
+        log.data(),
+        log_size);
+#else
+    LIBBPF_OPTS(bpf_prog_load_opts, opts,
+        .attempts = 1,
+        .expected_attach_type = BPF_XDP,
+        .log_level = 1,
+        .log_size = log_size,
+        .log_buf = log.data(),
+    );
+    return bpf_prog_load(
+        BPF_PROG_TYPE_XDP,
+        "conformance_verifier_test",
+        "MIT",
+        reinterpret_cast<const bpf_insn*>(program.data()),
+        program.size(),
+        &opts);
+#endif
+}
+
+static std::string
+trim_verifier_log(std::string log)
+{
+    if (auto nul = log.find('\0'); nul != std::string::npos) {
+        log.resize(nul);
+    }
+    while (!log.empty() && (log.back() == '\n' || log.back() == '\r')) {
+        log.pop_back();
+    }
+    return log;
+}
+
 static int
 bpf_elf_file_prepare_load_handler(struct bpf_program* prog, struct bpf_prog_load_opts* _unused, long map_fd)
 {
@@ -247,6 +294,7 @@ main(int argc, char** argv)
 {
     bool debug = false;
     bool elf = false;
+    bool verify_only = false;
     std::vector<std::string> args(argv, argv + argc);
     if (args.size() > 0) {
         args.erase(args.begin());
@@ -255,7 +303,7 @@ main(int argc, char** argv)
     std::string memory_string;
 
     if (args.size() > 0 && args[0] == "--help") {
-        std::cout << "usage: " << argv[0] << " [--program <base16 program bytes>] [<base16 memory bytes>] [--debug] [--elf]" << std::endl;
+        std::cout << "usage: " << argv[0] << " [--program <base16 program bytes>] [<base16 memory bytes>] [--debug] [--elf] [--verify-only]" << std::endl;
         return 1;
     }
 
@@ -273,19 +321,37 @@ main(int argc, char** argv)
         args.erase(args.begin());
     }
 
-    if (args.size() > 0 && args[0] == "--debug") {
-        debug = true;
-        args.erase(args.begin());
-    }
-
-    if (args.size() > 0 && args[0] == "--elf") {
-        elf = true;
+    while (!args.empty()) {
+        if (args[0] == "--debug") {
+            debug = true;
+        } else if (args[0] == "--elf") {
+            elf = true;
+        } else if (args[0] == "--verify-only") {
+            verify_only = true;
+        } else {
+            break;
+        }
         args.erase(args.begin());
     }
 
     if (args.size() > 0 && args[0].size() > 0) {
         std::cerr << "Unexpected arguments: " << args[0] << std::endl;
-        return 1;
+        return verify_only ? 2 : 1;
+    }
+
+    if (verify_only) {
+        if (elf) {
+            std::cerr << "--verify-only currently requires raw instruction input" << std::endl;
+            return 2;
+        }
+        std::string verifier_log;
+        int program_fd = verify_bpf_instructions(program_string, verifier_log);
+        if (program_fd < 0) {
+            std::cout << trim_verifier_log(std::move(verifier_log)) << std::endl;
+            return 1;
+        }
+        close(program_fd);
+        return 0;
     }
 
     union bpf_attr create_map_attr = {
