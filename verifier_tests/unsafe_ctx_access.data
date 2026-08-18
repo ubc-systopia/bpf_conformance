@@ -1,0 +1,14 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# The XDP prolog preserves the original xdp_md pointer in r6. A byte-sized
+# read from xdp_md is invalid; data/data_end fields require aligned u32 loads.
+-- asm
+ldxb %r0, [%r6+2]
+exit
+-- mem
+00
+-- verifier
+reject
+-- verifier reason
+Unsafe (bpf_context|ctx) access
