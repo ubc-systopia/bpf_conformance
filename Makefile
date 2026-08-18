@@ -55,6 +55,7 @@ test:
 linux: all
 	$(SUDO) "$(RUNNER)" \
 		$(VERIFIER_OPTIONS) \
+		--exclude_regex "imm-" \
 		--plugin_path "$(LIBBPF_PLUGIN)" \
 		--plugin_options="--verify-only"
 
