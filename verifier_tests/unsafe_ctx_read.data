@@ -3,6 +3,10 @@
 
 # The XDP prolog preserves the original xdp_md pointer in r6. A byte-sized
 # read from xdp_md is invalid; data/data_end fields require aligned u32 loads.
+
+# Linux: reject
+# Alivio: reject
+# Prevail: reject
 -- asm
 ldxb %r0, [%r6+2]
 exit

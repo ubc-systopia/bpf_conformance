@@ -1,7 +1,11 @@
 # Copyright (c) Microsoft Corporation
 # SPDX-License-Identifier: MIT
 
-# A scalar value cannot be used as the base of a memory access.
+# Using a scalar value as the base of a memory access.
+
+# Linux: reject
+# Alivio: reject
+# Prevail: reject
 -- asm
 mov %r1, 0
 ldxdw %r0, [%r1]
@@ -11,4 +15,4 @@ exit
 -- verifier
 reject
 -- verifier reason
-(Unsafe generic load)|(Invalid type)
+(R1 invalid mem access 'scalar')|(Unsafe generic load)|(Invalid type)

@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: MIT
 
 # An eight-byte stack store at fp-4 is not naturally aligned.
+
+# Linux: reject
+# Alivio: reject
+# Prevail: reject
 -- asm
 mov %r0, 1
 stxdw [%r10-4], %r0
@@ -11,4 +15,4 @@ exit
 -- verifier
 reject
 -- verifier reason
-(Misaligned offset)|(Upper bound must be at most total_stack_size)
+(misaligned stack access)|(Misaligned offset)|(Upper bound must be at most total_stack_size)

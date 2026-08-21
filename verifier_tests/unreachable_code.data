@@ -1,8 +1,11 @@
 # Copyright (c) Microsoft Corporation
 # SPDX-License-Identifier: MIT
 
-# Expected to be rejected by the Linux verifier due to unreachable code
-# However, both Alivio and Prevail are accepting the code
+# Jump to the end of the program, causing unreachable code.
+
+# Linux: reject
+# Alivio: accept
+# Prevail: accept
 -- asm
 lddw %r0, 0
 ja done

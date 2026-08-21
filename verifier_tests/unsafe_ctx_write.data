@@ -1,17 +1,18 @@
 # Copyright (c) Microsoft Corporation
 # SPDX-License-Identifier: MIT
 
-# Helper ID 1000000 is outside the helper set known to an XDP program.
+# Write data directly into the xdp_md context object.
 
 # Linux: reject
 # Alivio: reject
 # Prevail: reject
 -- asm
-call 1000000
+stw [%r6], 0
+mov %r0, 0
 exit
 -- mem
 00
 -- verifier
 reject
 -- verifier reason
-(invalid func unknown)|(Invalid helper ID)|(helper function is unavailable)
+((invalid bpf_context)|(Unsafe ctx) access)|(Cannot write to context pointer field)

@@ -26,7 +26,7 @@ endif
 ifneq ($(strip $(TEST)),)
 TEST_INPUT := --test_file_path "$(abspath $(TEST))"
 else
-TEST_INPUT := --test_file_directory "$(CURDIR)/tests"
+TEST_INPUT := --test_file_directory "$(CURDIR)/verifier_tests"
 endif
 
 VERIFIER_OPTIONS := \

@@ -3,6 +3,10 @@
 
 # The EXIT instruction reserves both register fields, but this encoding sets
 # dst_reg to R1.
+
+# Linux: reject
+# Alivio: accept
+# Prevail: reject
 -- raw
 0x00000000000001b7
 0x0000000000000195
@@ -11,4 +15,4 @@
 -- verifier
 reject
 -- verifier reason
-nonzero dst for register op 0x95
+(BPF_EXIT uses reserved fields)|(nonzero dst for register op 0x95)

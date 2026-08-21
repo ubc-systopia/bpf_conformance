@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: MIT
 
 # The stack slot at fp-8 has never been initialized.
+
+# Linux: accept
+# Alivio: accept
+# Prevail: reject
 -- asm
 ldxdw %r0, [%r10-8]
 exit

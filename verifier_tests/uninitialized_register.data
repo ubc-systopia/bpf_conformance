@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: MIT
 
 # R7 has not been initialized when it is used as the source of the move.
+
+# Linux: reject
+# Alivio: reject
+# Prevail: reject
 -- asm
 mov %r0, %r7
 exit
