@@ -1,0 +1,13 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# Opcode 0x00 is not a valid standalone eBPF instruction.
+-- raw
+0x0000000000000000
+0x0000000000000095
+-- mem
+00
+-- verifier
+reject
+-- verifier reason
+bad instruction op 0x0

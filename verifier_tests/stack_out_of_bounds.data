@@ -1,0 +1,15 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# Stack accesses must use negative offsets from R10; R10+0 is outside the
+# writable stack region.
+-- asm
+stdw [%r10], 0
+mov %r0, 0
+exit
+-- mem
+00
+-- verifier
+reject
+-- verifier reason
+(Stack out of bounds)|(Upper bound must be at most total_stack_size)

@@ -1,0 +1,14 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# The generated XDP prolog proves that only one packet byte is available, but
+# this program attempts to read eight bytes from the packet data pointer.
+-- asm
+ldxdw %r0, [%r1]
+exit
+-- mem
+00
+-- verifier
+reject
+-- verifier reason
+(Unsafe packet load)|(Upper bound must be at most packet_size)

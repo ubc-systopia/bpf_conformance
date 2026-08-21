@@ -1,0 +1,15 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# R6 is the saved XDP context pointer and R10 is the stack pointer. Adding one
+# pointer to another is prohibited.
+-- asm
+add %r6, %r10
+mov %r0, 0
+exit
+-- mem
+00
+-- verifier
+reject
+-- verifier reason
+(Invalid pointer arithmetic)|(Only numbers can be added to pointers)

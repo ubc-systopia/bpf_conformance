@@ -1,0 +1,14 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# A scalar value cannot be used as the base of a memory access.
+-- asm
+mov %r1, 0
+ldxdw %r0, [%r1]
+exit
+-- mem
+00
+-- verifier
+reject
+-- verifier reason
+(Unsafe generic load)|(Invalid type)
