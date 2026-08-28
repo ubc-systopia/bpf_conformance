@@ -11,3 +11,4 @@ _deps
 build/*
 _codeql_*
 build-wsl/
+.vscode/*

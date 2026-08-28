@@ -3,15 +3,18 @@
 
 // bpf_conformance verifier plugin for Prevail.
 
+#include <array>
 #include <cerrno>
+#include <charconv>
 #include <cctype>
-#include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
-#include <iterator>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
@@ -80,50 +83,47 @@ parse_options(int argc, char** argv, options_t& options)
     return true;
 }
 
-int
-hex_digit(char value)
+std::string
+system_error_message(int error)
 {
-    if (value >= '0' && value <= '9') {
-        return value - '0';
-    }
-    if (value >= 'a' && value <= 'f') {
-        return value - 'a' + 10;
-    }
-    if (value >= 'A' && value <= 'F') {
-        return value - 'A' + 10;
-    }
-    return -1;
+    return std::error_code(error, std::generic_category()).message();
 }
 
-bool
-decode_hex(const std::string& encoded, std::vector<unsigned char>& decoded)
+std::optional<std::vector<unsigned char>>
+decode_hex(std::istream& input)
 {
-    int high_nibble = -1;
-    for (char value : encoded) {
-        if (std::isspace(static_cast<unsigned char>(value))) {
-            continue;
+    std::vector<unsigned char> result;
+    std::string token;
+
+    while (input >> token) {
+        if (token.size() != 2) {
+            std::cerr << "hexadecimal bytes must contain exactly two digits" << std::endl;
+            return std::nullopt;
         }
-        int digit = hex_digit(value);
-        if (digit < 0) {
-            std::cerr << "invalid character in hex-encoded ELF input" << std::endl;
-            return false;
+
+        unsigned int byte = 0;
+        const auto* begin = token.data();
+        const auto* end = begin + token.size();
+        const auto [position, error] = std::from_chars(begin, end, byte, 16);
+        if (error != std::errc{} || position != end || byte > 0xff) {
+            std::cerr << "invalid hexadecimal byte: " << token << std::endl;
+            return std::nullopt;
         }
-        if (high_nibble < 0) {
-            high_nibble = digit;
-        } else {
-            decoded.push_back(static_cast<unsigned char>((high_nibble << 4) | digit));
-            high_nibble = -1;
-        }
+
+        result.push_back(static_cast<unsigned char>(byte));
     }
-    if (high_nibble >= 0) {
-        std::cerr << "hex-encoded ELF input has an odd number of digits" << std::endl;
-        return false;
+
+    if (input.bad()) {
+        std::cerr << "failed to read hex-encoded ELF input" << std::endl;
+        return std::nullopt;
     }
-    if (decoded.empty()) {
+
+    if (result.empty()) {
         std::cerr << "empty ELF input" << std::endl;
-        return false;
+        return std::nullopt;
     }
-    return true;
+
+    return result;
 }
 
 class temporary_file_t
@@ -132,71 +132,72 @@ class temporary_file_t
     ~temporary_file_t()
     {
         if (!_path.empty()) {
-            unlink(_path.c_str());
+            std::error_code error;
+            std::filesystem::remove(_path, error);
         }
     }
+
+    temporary_file_t() = default;
+    temporary_file_t(const temporary_file_t&) = delete;
+    temporary_file_t& operator=(const temporary_file_t&) = delete;
 
     bool write(const std::vector<unsigned char>& contents)
     {
-        auto pattern = (std::filesystem::temp_directory_path() / "prevail-conformance-XXXXXX.o").string();
-        std::vector<char> path(pattern.begin(), pattern.end());
-        path.push_back('\0');
+        std::string path = (std::filesystem::temp_directory_path() / "prevail-conformance-XXXXXX.o").string();
         int fd = mkstemps(path.data(), 2);
         if (fd < 0) {
-            std::cerr << "failed to create temporary ELF: " << std::strerror(errno) << std::endl;
+            std::cerr << "failed to create temporary ELF: " << system_error_message(errno) << std::endl;
             return false;
         }
-        _path = path.data();
+        _path = path;
 
-        size_t written = 0;
-        while (written < contents.size()) {
-            ssize_t result = ::write(fd, contents.data() + written, contents.size() - written);
-            if (result < 0 && errno == EINTR) {
-                continue;
-            }
-            if (result <= 0) {
-                std::cerr << "failed to write temporary ELF: " << std::strerror(errno) << std::endl;
-                close(fd);
-                return false;
-            }
-            written += static_cast<size_t>(result);
-        }
         if (close(fd) < 0) {
-            std::cerr << "failed to close temporary ELF: " << std::strerror(errno) << std::endl;
+            std::cerr << "failed to close temporary ELF: " << system_error_message(errno) << std::endl;
             return false;
         }
+
+        std::ofstream output(_path, std::ios::binary | std::ios::trunc);
+        output.write(reinterpret_cast<const char*>(contents.data()), static_cast<std::streamsize>(contents.size()));
+        output.close();
+        if (!output) {
+            std::cerr << "failed to write temporary ELF" << std::endl;
+            return false;
+        }
+
         return true;
     }
 
-    const std::string& path() const
+    const std::filesystem::path& path() const
     {
         return _path;
     }
 
   private:
-    std::string _path;
+    std::filesystem::path _path;
 };
 
 bool
-run_prevail(const options_t& options, const std::string& elf_path, process_result_t& result)
+run_prevail(const options_t& options, const std::filesystem::path& elf_path, process_result_t& result)
 {
-    int output_pipe[2];
-    if (pipe(output_pipe) < 0) {
-        std::cerr << "failed to create output pipe: " << std::strerror(errno) << std::endl;
+    std::array<int, 2> output_pipe;
+    if (pipe(output_pipe.data()) < 0) {
+        std::cerr << "failed to create output pipe: " << system_error_message(errno) << std::endl;
         return false;
     }
 
     pid_t child = fork();
     if (child < 0) {
-        std::cerr << "failed to fork Prevail: " << std::strerror(errno) << std::endl;
+        std::cerr << "failed to fork Prevail: " << system_error_message(errno) << std::endl;
         close(output_pipe[0]);
         close(output_pipe[1]);
         return false;
     }
     if (child == 0) {
         close(output_pipe[0]);
-        dup2(output_pipe[1], STDOUT_FILENO);
-        dup2(output_pipe[1], STDERR_FILENO);
+        if (dup2(output_pipe[1], STDOUT_FILENO) < 0 || dup2(output_pipe[1], STDERR_FILENO) < 0) {
+            std::cerr << "failed to redirect Prevail output: " << system_error_message(errno) << std::endl;
+            _exit(127);
+        }
         close(output_pipe[1]);
         execl(
             options.prevail.c_str(),
@@ -206,30 +207,39 @@ run_prevail(const options_t& options, const std::string& elf_path, process_resul
             options.section.c_str(),
             "-f",
             static_cast<char*>(nullptr));
-        std::cerr << "failed to invoke Prevail: " << std::strerror(errno) << std::endl;
+        std::cerr << "failed to invoke Prevail: " << system_error_message(errno) << std::endl;
         _exit(127);
     }
 
     close(output_pipe[1]);
-    char buffer[4096];
+    std::array<char, 4096> buffer;
+    bool read_succeeded = true;
     while (true) {
-        ssize_t size = read(output_pipe[0], buffer, sizeof(buffer));
+        ssize_t size = read(output_pipe[0], buffer.data(), buffer.size());
         if (size < 0 && errno == EINTR) {
             continue;
         }
-        if (size <= 0) {
+        if (size < 0) {
+            std::cerr << "failed to read Prevail output: " << system_error_message(errno) << std::endl;
+            read_succeeded = false;
             break;
         }
-        result.output.append(buffer, static_cast<size_t>(size));
+        if (size == 0) {
+            break;
+        }
+        result.output.append(buffer.data(), static_cast<size_t>(size));
     }
     close(output_pipe[0]);
 
     int status = 0;
     while (waitpid(child, &status, 0) < 0) {
         if (errno != EINTR) {
-            std::cerr << "failed to wait for Prevail: " << std::strerror(errno) << std::endl;
+            std::cerr << "failed to wait for Prevail: " << system_error_message(errno) << std::endl;
             return false;
         }
+    }
+    if (!read_succeeded) {
+        return false;
     }
     result.exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : 128;
     return true;
@@ -266,16 +276,13 @@ main(int argc, char** argv)
         return 2;
     }
 
-    std::string encoded_elf{
-        std::istreambuf_iterator<char>(std::cin),
-        std::istreambuf_iterator<char>()};
-    std::vector<unsigned char> elf;
-    if (!decode_hex(encoded_elf, elf)) {
+    auto elf = decode_hex(std::cin);
+    if (!elf) {
         return 2;
     }
 
     temporary_file_t temporary_elf;
-    if (!temporary_elf.write(elf)) {
+    if (!temporary_elf.write(*elf)) {
         return 2;
     }
 
