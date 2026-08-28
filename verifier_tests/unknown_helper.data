@@ -1,0 +1,17 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# Helper ID 1000000 is outside the helper set known to an XDP program.
+
+# Linux: reject
+# Alivio: reject
+# Prevail: reject
+-- asm
+call 1000000
+exit
+-- mem
+00
+-- verifier
+reject
+-- rejection reason
+(invalid func unknown)|(Invalid helper ID)|(helper function is unavailable)

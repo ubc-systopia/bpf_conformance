@@ -1,0 +1,19 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# R6 is the saved XDP context pointer and R10 is the stack pointer.
+# Adding one pointer to another.
+
+# Linux: reject
+# Alivio: reject
+# Prevail: reject
+-- asm
+add %r6, %r10
+mov %r0, 0
+exit
+-- mem
+00
+-- verifier
+reject
+-- rejection reason
+(R6 pointer \+= pointer prohibited)|(Invalid pointer arithmetic)|(Only numbers can be added to pointers)

@@ -1,0 +1,18 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# The generated XDP prolog proves that only one packet byte is available, but
+# this program attempts to read eight bytes from the packet data pointer.
+
+# Linux: reject
+# Alivio: reject
+# Prevail: reject
+-- asm
+ldxdw %r0, [%r1]
+exit
+-- mem
+00
+-- verifier
+reject
+-- rejection reason
+(R1 offset is outside of the packet)|(Unsafe packet load)|(Upper bound must be at most packet_size)

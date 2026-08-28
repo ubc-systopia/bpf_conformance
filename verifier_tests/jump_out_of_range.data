@@ -1,0 +1,17 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# Raw encoding of `ja +32767`; the branch target is outside the program.
+
+# Linux: reject
+# Alivio: infrastructure error
+# Prevail: reject
+-- raw
+0x000000007fff0005
+0x0000000000000095
+-- mem
+00
+-- verifier
+reject
+-- rejection reason
+jump out of (range)|(bounds)

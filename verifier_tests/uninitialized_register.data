@@ -1,0 +1,17 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# R7 has not been initialized when it is used as the source of the move.
+
+# Linux: reject
+# Alivio: reject
+# Prevail: reject
+-- asm
+mov %r0, %r7
+exit
+-- mem
+00
+-- verifier
+reject
+-- rejection reason
+(R7 !read_ok)|(Invalid type)

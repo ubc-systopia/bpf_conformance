@@ -1,0 +1,18 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# Write data directly into the xdp_md context object.
+
+# Linux: reject
+# Alivio: reject
+# Prevail: reject
+-- asm
+stw [%r6], 0
+mov %r0, 0
+exit
+-- mem
+00
+-- verifier
+reject
+-- rejection reason
+((invalid bpf_context)|(Unsafe ctx) access)|(Cannot write to context pointer field)

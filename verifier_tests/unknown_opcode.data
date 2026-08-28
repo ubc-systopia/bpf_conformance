@@ -1,0 +1,17 @@
+# Copyright (c) Microsoft Corporation
+# SPDX-License-Identifier: MIT
+
+# Opcode 0x00 is not a valid standalone eBPF instruction.
+
+# Linux: reject
+# Alivio: infrastructure error
+# Prevail: reject
+-- raw
+0x0000000000000000
+0x0000000000000095
+-- mem
+00
+-- verifier
+reject
+-- rejection reason
+(unknown opcode 00)|(bad instruction op 0x0)

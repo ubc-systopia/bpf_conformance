@@ -1,3 +1,9 @@
 [submodule "external/elfio"]
 	path = external/elfio
 	url = https://github.com/serge1/ELFIO.git
+[submodule "external/prevail"]
+	path = external/prevail
+	url = https://github.com/vbpf/prevail.git
+[submodule "external/alivio"]
+	path = external/alivio
+	url = https://github.com/yc2454/alivio

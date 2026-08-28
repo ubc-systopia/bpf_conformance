@@ -167,12 +167,24 @@ bpf_conformance_run(
         // Expected return value - Expected return value from the BPF program.
         // Expected error string - String returned by BPF runtime if the program fails.
         // BPF instructions - Instructions to pass to the BPF program.
-        auto [input_memory, expected_return_value, expected_error_string, byte_code] = parse_test_file(test);
+        auto parsed_test = parse_test_file_with_verifier(test);
+        auto& input_memory = parsed_test.memory;
+        auto expected_return_value = parsed_test.expected_return_value;
+        auto& expected_error_string = parsed_test.expected_error;
+        auto& byte_code = parsed_test.instructions;
 
         // It the test file has no BPF instructions, then skip it.
         if (byte_code.size() == 0) {
             test_results[test] = {
                 bpf_conformance_test_result_t::TEST_RESULT_SKIP, "Test file has no BPF instructions."};
+            _log_debug_result(test_results, test);
+            continue;
+        }
+
+        if (!options.verifier_mode && !parsed_test.has_runtime_expectation) {
+            test_results[test] = {
+                bpf_conformance_test_result_t::TEST_RESULT_SKIP,
+                "Test file has no runtime expectation."};
             _log_debug_result(test_results, test);
             continue;
         }
@@ -268,6 +280,63 @@ bpf_conformance_run(
             // Strip the trailing newline from the error string.
             if (!error_string.empty() && error_string.back() == '\n') {
                 error_string = error_string.substr(0, error_string.size() - 1);
+            }
+
+            if (options.verifier_mode) {
+                if (result.exit_code != 0 && result.exit_code != 1) {
+                    test_results[test] = {
+                        bpf_conformance_test_result_t::TEST_RESULT_ERROR,
+                        "Verifier plugin returned infrastructure error code " + std::to_string(result.exit_code) +
+                            (error_string.empty() ? "" : ": " + error_string)};
+                    _log_debug_result(test_results, test);
+                    continue;
+                }
+
+                const auto actual_verdict = result.exit_code == 0
+                                                ? bpf_verifier_verdict_t::accept
+                                                : bpf_verifier_verdict_t::reject;
+                const auto expected = parsed_test.verifier_expectation.value_or(
+                    bpf_verifier_expectation_t{bpf_verifier_verdict_t::accept, ""});
+                std::string reason = !return_value_string.empty() ? return_value_string : error_string;
+
+                if (actual_verdict != expected.verdict) {
+                    test_results[test] = {
+                        bpf_conformance_test_result_t::TEST_RESULT_FAIL,
+                        std::string("verifier ") +
+                            (actual_verdict == bpf_verifier_verdict_t::accept ? "accepted" : "rejected") +
+                            " but expected " +
+                            (expected.verdict == bpf_verifier_verdict_t::accept ? "acceptance" : "rejection") +
+                            (reason.empty() ? "" : ": " + reason)};
+                } else {
+                    bool reason_matches = true;
+                    if (!expected.reason.empty()) {
+                        try {
+                            reason_matches = std::regex_search(reason, std::regex(expected.reason));
+                        } catch (const std::regex_error& error) {
+                            test_results[test] = {
+                                bpf_conformance_test_result_t::TEST_RESULT_ERROR,
+                                "invalid verifier rejection reason regex '" + expected.reason + "': " + error.what()};
+                            _log_debug_result(test_results, test);
+                            continue;
+                        }
+                    }
+
+                    if (!reason_matches) {
+                        test_results[test] = {
+                            bpf_conformance_test_result_t::TEST_RESULT_FAIL,
+                            "verifier rejection reason does not match expected regex '" + expected.reason +
+                                "'\nActual verifier output:\n" + (reason.empty() ? "<empty>" : reason)};
+                    } else {
+                        std::string message =
+                            actual_verdict == bpf_verifier_verdict_t::accept ? "accepted" : "rejected";
+                        if (actual_verdict == bpf_verifier_verdict_t::reject && !expected.reason.empty()) {
+                            message += ": " + expected.reason;
+                        }
+                        test_results[test] = {bpf_conformance_test_result_t::TEST_RESULT_PASS, message};
+                    }
+                }
+                _log_debug_result(test_results, test);
+                continue;
             }
 
             // If the plugin returned a non-zero exit code, then check to see if the error string matches the expected
