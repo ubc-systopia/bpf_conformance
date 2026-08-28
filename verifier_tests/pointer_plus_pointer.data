@@ -15,5 +15,5 @@ exit
 00
 -- verifier
 reject
--- verifier reason
+-- rejection reason
 (R6 pointer \+= pointer prohibited)|(Invalid pointer arithmetic)|(Only numbers can be added to pointers)

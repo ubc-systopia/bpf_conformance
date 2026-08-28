@@ -97,7 +97,7 @@ stderr and is included in the test result.
 
 Tests without verifier metadata default to expected acceptance. Negative
 verifier tests use `-- verifier` followed by `reject`; an optional
-`-- verifier reason` section supplies an ECMAScript regular expression. The
+`-- rejection reason` section supplies an ECMAScript regular expression. The
 runner searches the verifier's complete output for a match, so an unanchored
 plain string continues to work.
 

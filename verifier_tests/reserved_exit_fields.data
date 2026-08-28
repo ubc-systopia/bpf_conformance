@@ -14,5 +14,5 @@
 00
 -- verifier
 reject
--- verifier reason
+-- rejection reason
 (BPF_EXIT uses reserved fields)|(nonzero dst for register op 0x95)

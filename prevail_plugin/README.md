@@ -30,6 +30,6 @@ that is searched for in the complete verifier output:
 ```text
 -- verifier
 reject
--- verifier reason
+-- rejection reason
 Unsafe (bpf_context|ctx) access
 ```

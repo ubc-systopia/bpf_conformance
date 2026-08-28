@@ -15,5 +15,5 @@ exit
 00
 -- verifier
 reject
--- verifier reason
+-- rejection reason
 (invalid write to stack R10)|(Stack out of bounds)|(Upper bound must be at most total_stack_size)

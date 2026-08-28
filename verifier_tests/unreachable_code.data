@@ -18,5 +18,5 @@ exit
 00
 -- verifier
 reject
--- verifier reason
+-- rejection reason
 unreachable insn 12

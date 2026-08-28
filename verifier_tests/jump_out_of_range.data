@@ -13,5 +13,5 @@
 00
 -- verifier
 reject
--- verifier reason
+-- rejection reason
 jump out of (range)|(bounds)

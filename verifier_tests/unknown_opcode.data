@@ -13,5 +13,5 @@
 00
 -- verifier
 reject
--- verifier reason
+-- rejection reason
 (unknown opcode 00)|(bad instruction op 0x0)

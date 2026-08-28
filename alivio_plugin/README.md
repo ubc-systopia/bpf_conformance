@@ -8,7 +8,7 @@ existing `verify` command.
 Verifier plugin exit codes are:
 
 - `0`: accepted
-- `1`: rejected; stdout contains the verifier reason
+- `1`: rejected; stdout contains the rejection reason
 - `2` or greater: adapter or infrastructure error
 
 Example:
@@ -30,6 +30,6 @@ that is searched for in the complete verifier output:
 ```text
 -- verifier
 reject
--- verifier reason
+-- rejection reason
 Unsafe (bpf_context|ctx) access
 ```

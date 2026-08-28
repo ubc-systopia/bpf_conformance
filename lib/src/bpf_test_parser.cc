@@ -67,7 +67,7 @@ parse_test_file_with_verifier(const std::filesystem::path& data_file)
             } else if (line.find("error") != std::string::npos) {
                 state = _state::state_error;
                 continue;
-            } else if (line.find("verifier reason") != std::string::npos) {
+            } else if (line.find("rejection reason") != std::string::npos) {
                 state = _state::state_verifier_reason;
                 continue;
             } else if (line.find("verifier") != std::string::npos) {
