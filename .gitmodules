@@ -7,3 +7,6 @@
 [submodule "external/alivio"]
 	path = external/alivio
 	url = https://github.com/yc2454/alivio
+[submodule "rbpf_plugin/rbpf"]
+	path = rbpf_plugin/rbpf
+	url = https://github.com/qmonnet/rbpf.git
